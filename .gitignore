@@ -1,2 +1,3 @@
 *.json
 yes*
+.DS_Store

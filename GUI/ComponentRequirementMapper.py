@@ -169,7 +169,7 @@ class RequirementView(ScrollView):
         self.grid = GridLayout(cols=1, spacing=10, size_hint_y=None, row_default_height='20dp', row_force_default=True)
         self.grid.bind(minimum_height=self.grid.setter('height'))
 
-        add_button = Button(text="Add New Requirement")
+        add_button = Button(text="Add New Requirement",background_color=[0,0,1,1])
         self.grid.add_widget(add_button)
         add_button.bind(on_press=lambda x: self.add_new_row())
         i=0
@@ -239,7 +239,7 @@ class ComponentView(ScrollView):
         self.grid = GridLayout(cols=1, spacing=10, size_hint_y=None, row_default_height='40dp', row_force_default=True)
         self.grid.bind(minimum_height=self.grid.setter('height'))
 
-        add_button = Button(text="Add New component")
+        add_button = Button(text="Add New component",background_color=[0,0,1,1])
         self.grid.add_widget(add_button)
         add_button.bind(on_press=lambda x: self.add_new_row())
         for key in self.rows:
@@ -261,10 +261,9 @@ class Menu(BoxLayout):
         super(Menu, self).__init__(**kwargs)
         self.size_hint = (1, None)
         self.orientation = 'horizontal'
-        exprt_btn = Button(text='Export', size_hint=(None, None), size=(100, 50))
+        exprt_btn = Button(text='Export JSON', size_hint=(None, None), size=(400, 70),background_color=[0,1,0,1])
         exprt_btn.bind(on_press=self.generate_popup)
         self.add_widget(exprt_btn)
-        self.add_widget(Button(text='Other', size_hint=(None, None), size=(100, 50)))
 
 
     def generate_popup(self, any):
