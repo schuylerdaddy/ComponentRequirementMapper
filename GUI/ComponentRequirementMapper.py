@@ -8,7 +8,8 @@ from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
-from GUI.FileDialogue import FileDialogue
+from GUI.SaveFileDialogue import SaveFileDialogue
+
 import json
 
 
@@ -68,7 +69,6 @@ class CheckboxModal(ModalView):
         g=GridLayout(cols=4)
 
         self.checked_values ={}
-        print(list)
         g.add_widget(Label(text='Req #'))
         g.add_widget(Label(text='High'))
         g.add_widget(Label(text='Medium'))
@@ -210,7 +210,6 @@ class RequirementLinkView(BoxLayout):
     def populate_label(self, dict):
         self.link_ids = []
         for id,cbox in dict.items():
-            print(cbox)
             if cbox['value'].active:
                 self.link_ids.append(id)
         self.text.text = ','.join(self.link_ids)
@@ -277,8 +276,7 @@ class Menu(BoxLayout):
                 }, links.link_ids))}
             components.append(component)
             self.output = {'components':components}
-            print(self.output)
-            FileDialogue(button_text="Save", on_ok=self.save_components_to_file).open()
+            SaveFileDialogue(button_text="Save", on_ok=self.save_components_to_file).open()
 
     def save_components_to_file(self, path):
         with open(path, 'w') as outfile:

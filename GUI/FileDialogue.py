@@ -6,14 +6,15 @@ from kivy.uix.boxlayout import BoxLayout
 from functools import partial
 import os
 
-class FileDialogue(BoxLayout):
+class OpenFileDialogue(BoxLayout):
     def __init__(self,
                  button_text,
                  on_ok = lambda *args: None,
                  on_cancel = lambda *args: None,
+                 title='Choose File',
                  default_path = os.getcwd()
 , **kwargs):
-        super(FileDialogue, self).__init__(**kwargs)
+        super(OpenFileDialogue, self).__init__(**kwargs)
         self.orientation = 'vertical'
         self.size_hint = (1, 1)
         fc = self.get_filechooser(default_path)
@@ -26,7 +27,7 @@ class FileDialogue(BoxLayout):
         self.add_widget(cncl_btn)
         self.on_ok = on_ok
         self.on_cancel = on_cancel
-        self.popup = Popup(title='Choose File', content=self, auto_dismiss=True)
+        self.popup = Popup(title=title, content=self, auto_dismiss=True)
 
     def handle_selection(self, filechooser, arg):
         self.handle_path(filechooser.path, filechooser.selection)

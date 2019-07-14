@@ -1,17 +1,13 @@
 from kivy.uix.anchorlayout import AnchorLayout
-from kivy.lang import Builder
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 import Model.Tabs as tb
 from kivy.uix.scrollview import ScrollView
-from kivy.core.window import Window
 from kivy.uix.gridlayout import GridLayout
-from kivy.graphics import Color, Rectangle
-from GUI.FileDialogue import FileDialogue
+from GUI.FileDialogue import OpenFileDialogue
 from functools import partial
-import os
 
 
 red = [1,0,0,1]
@@ -52,7 +48,7 @@ class MenuBar(AnchorLayout):
         self.data = None
 
     def generate_popup(self,any):
-        FileDialogue(button_text="Load",on_ok= self.read_filepath).open()
+        OpenFileDialogue(button_text="Load",on_ok= self.read_filepath).open()
 
     def read_filepath(self,fp):
         if fp:
