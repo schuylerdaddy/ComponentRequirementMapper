@@ -193,7 +193,7 @@ def component_proportion(json):
     labels = list(map(itemgetter(0),coms))
     values = list(map(lambda x: x[1] / unique_req_count, coms))
 
-    table_data = []
+    table_data = [("'#'","'Requirement Coverage'")]
     for idx, val in enumerate(labels, start=1):
         v = values[idx-1]
         txt = '{}: {:.2%}'.format(val,v)
@@ -232,7 +232,7 @@ def requirement_proportion(json):
     labels = []
     values = list(map(lambda x: x[1] / com_count, reqs))
 
-    table_data = []
+    table_data = [("'#'","'Component Coverage'")]
     for idx, val in enumerate(reqs, start=1):
         v = values[idx - 1]
         txt = '{}: {:.2%}'.format(val[0], v)
@@ -248,6 +248,86 @@ def requirement_proportion(json):
     plt.title('Requirement Proportion(not weighted)')
     return FigureCanvasKivyAgg(plt.gcf()), table_data
 
+def get_requirement_score(reqs):
+        t = 0
+        for req in reqs:
+            if req['level'] == 'low':
+                t += 1
+            if req['level'] == 'medium':
+                t += 2
+            if req['level'] == 'high':
+                t += 3
+        return t/3
+
+def component_influence(json):
+    if not json:
+        json = test_json
+    com_req = JSON.loads(json)['components']
+
+    all_reqs = unique_requirements(json)
+    unique_req_count = len(all_reqs)
+
+    coms = sorted([(com['name'],get_requirement_score(com['requirements'])) for com in com_req],key=itemgetter(1), reverse=True)
+
+    labels = list(map(itemgetter(0),coms))
+    values = list(map(lambda x: x[1] / unique_req_count, coms))
+
+    table_data = [("'#'","'Requirement Coverage'")]
+    for idx, val in enumerate(coms, start=1):
+        v = values[idx-1]
+        txt = '{}: {:.2%}'.format(val[0],v)
+        table_data.append((str(idx),txt))
+        labels[idx - 1] = str(idx)
+
+    #explode = (0, 0.1, 0, 0)  # only "explode" the 2nd slice (i.e. 'Hogs')
+
+    fig1, ax1 = plt.subplots()
+    val_mod = list(map(lambda x:x*150.0,values))
+    ax1.pie(val_mod, labels=labels, autopct='%1.1f%%',
+            shadow=True, startangle=90)
+    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+    plt.title('Component Influence (weighted)')
+    return FigureCanvasKivyAgg(plt.gcf()),table_data
+
+def requirement_influence(json):
+    if not json:
+        json = test_json
+    com_req = JSON.loads(json)['components']
+
+    req_com = {}
+    coms = set()
+
+    for com in com_req:
+        coms.add(com['name'])
+        for req in com['requirements']:
+            if req['desc'] not in req_com:
+                req_com[req['desc']] = []
+            req_com[req['desc']].append({'name':com['name'],'level':req['level']})
+
+    com_count = len(coms)
+
+    reqs = sorted([(req, get_requirement_score(coms)) for req,coms in req_com.items() ], key=itemgetter(1), reverse=True)
+
+    labels = []
+    values = list(map(lambda x: x[1] / com_count, reqs))
+
+    table_data = [("'#'","'Component Coverage'")]
+    for idx, val in enumerate(reqs, start=1):
+        v = values[idx - 1]
+        txt = '{}: {:.2%}'.format(val[0], v)
+        table_data.append((str(idx), txt))
+        labels.append(str(idx))
+    # explode = (0, 0.1, 0, 0)  # only "explode" the 2nd slice (i.e. 'Hogs')
+
+    fig1, ax1 = plt.subplots()
+    ax1.pie(values, labels=labels, autopct='%1.1f%%',
+            shadow=True, startangle=90)
+    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+    plt.title('Requirement Influence(Weighted)')
+    return FigureCanvasKivyAgg(plt.gcf()), table_data
+
 # def component_affinity(json):
 #
 # def requirement_affinity(json):
@@ -258,8 +338,8 @@ statisticViews = {
     'Requirement Correlation':scatter_plot,
     'Component Proportion': component_proportion,
     'Requirement Proportion': requirement_proportion,
-    'Component Influence': scatter_plot,
-    'Requirement Influence': scatter_plot,
+    'Component Influence': component_influence,
+    'Requirement Influence': requirement_influence,
     'Component Affinity': scatter_plot,
     'Requirement Affinity': scatter_plot
 }
