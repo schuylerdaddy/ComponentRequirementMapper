@@ -1,4 +1,6 @@
 import json as JSON
+from operator import itemgetter
+
 import numpy as np
 import matplotlib.pyplot as plt
 from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
@@ -139,7 +141,6 @@ def scatter_plot(json):
     requirements_apply(json, lambda r, c: set_dictionary_insert(req_map,r['desc'],(c['name'],r['level'])))
     requirements_apply(json, lambda r, c: set_dictionary_insert(com_map,c['name'],(r['desc'],r['level'])))
 
-    yplots = []
     xplot_desc_map = {}
     num = 1
     unique_reqs = {}
@@ -176,14 +177,77 @@ def scatter_plot(json):
     return FigureCanvasKivyAgg(plt.gcf()),cell_text
 
 
-# def component_correlation(json):
-#
-# def requirement_correlation(json):
-#
-# def component_proportion(json):
-#
-# def requirement_proportion(json):
-#
+#def component_correlation(json):
+
+#def requirement_correlation(json):
+
+def component_proportion(json):
+    if not json:
+        json = test_json
+    com_req = JSON.loads(json)['components']
+
+    all_reqs = unique_requirements(json)
+    unique_req_count = len(all_reqs)
+    coms = sorted([(com['name'],len(com['requirements'])) for com in com_req],key=itemgetter(1), reverse=True)
+
+    labels = list(map(itemgetter(0),coms))
+    values = list(map(lambda x: x[1] / unique_req_count, coms))
+
+    table_data = []
+    for idx, val in enumerate(labels, start=1):
+        v = values[idx-1]
+        txt = '{}: {:.2%}'.format(val,v)
+        table_data.append((str(idx),txt))
+        labels[idx - 1] = str(idx)
+
+    #explode = (0, 0.1, 0, 0)  # only "explode" the 2nd slice (i.e. 'Hogs')
+
+    fig1, ax1 = plt.subplots()
+    ax1.pie(values, labels=labels, autopct='%1.1f%%',
+            shadow=True, startangle=90)
+    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+    plt.title('Component Proportion(not weighted)')
+    return FigureCanvasKivyAgg(plt.gcf()),table_data
+
+def requirement_proportion(json):
+    if not json:
+        json = test_json
+    com_req = JSON.loads(json)['components']
+
+    req_com = {}
+    coms = set()
+
+    for com in com_req:
+        coms.add(com['name'])
+        for req in com['requirements']:
+            if req['desc'] not in req_com:
+                req_com[req['desc']] = []
+            req_com[req['desc']].append(com['name'])
+
+    com_count = len(coms)
+
+    reqs = sorted([(req, len(coms)) for req,coms in req_com.items() ], key=itemgetter(1), reverse=True)
+
+    labels = []
+    values = list(map(lambda x: x[1] / com_count, reqs))
+
+    table_data = []
+    for idx, val in enumerate(reqs, start=1):
+        v = values[idx - 1]
+        txt = '{}: {:.2%}'.format(val[0], v)
+        table_data.append((str(idx), txt))
+        labels.append(str(idx))
+    # explode = (0, 0.1, 0, 0)  # only "explode" the 2nd slice (i.e. 'Hogs')
+
+    fig1, ax1 = plt.subplots()
+    ax1.pie(values, labels=labels, autopct='%1.1f%%',
+            shadow=True, startangle=90)
+    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+    plt.title('Requirement Proportion(not weighted)')
+    return FigureCanvasKivyAgg(plt.gcf()), table_data
+
 # def component_affinity(json):
 #
 # def requirement_affinity(json):
@@ -192,8 +256,10 @@ statisticViews = {
     'Scatter Plot':scatter_plot,
     'Component Correlation':scatter_plot,
     'Requirement Correlation':scatter_plot,
-    'Component Proportion': scatter_plot,
-    'Requirement Proportion': scatter_plot,
+    'Component Proportion': component_proportion,
+    'Requirement Proportion': requirement_proportion,
+    'Component Influence': scatter_plot,
+    'Requirement Influence': scatter_plot,
     'Component Affinity': scatter_plot,
     'Requirement Affinity': scatter_plot
 }
