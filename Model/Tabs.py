@@ -252,11 +252,11 @@ def requirement_proportion(json):
 def get_requirement_score(reqs):
         t = 0
         for req in reqs:
-            if req['level'] == 'low':
+            if req['level'].lower() == 'low':
                 t += 1
-            if req['level'] == 'medium':
+            if req['level'].lower() == 'medium':
                 t += 2
-            if req['level'] == 'high':
+            if req['level'].lower() == 'high':
                 t += 3
         return t/3
 
@@ -333,6 +333,7 @@ def generate_correlation_score(g1,g2,total_count):
 
     tot = 0
     def get_level_num(level):
+        level = level.lower()
         if level == 'low':
             return 1
         elif level == 'medium':
@@ -350,9 +351,9 @@ def generate_correlation_score(g1,g2,total_count):
         if desc in g2_names:
             s1 = get_level_num(g1[idx]['level'])
             s2 = get_level_num(g2[g2_names.index(desc)]['level'])
-            tot += (s1+s2)
+            tot += (s1+s2)/3
 
-    return tot/total_count/2 *3
+    return tot/total_count/2
 
 def generate_affinity_score(group1,group2):
     #determine max length
@@ -363,6 +364,7 @@ def generate_affinity_score(group1,group2):
     tot = 0
 
     def get_level_num(level):
+        level = level.lower()
         if level == 'low':
             return 1
         elif level == 'medium':
@@ -480,38 +482,37 @@ def component_affinity(json):
     if not json:
         json = test_json
     com_req = JSON.loads(json)['components']
-    req_dict = {}
-    req_scores = {}
-    reqs = []
+    com_dict = {}
+    com_scores = {}
+    coms = []
+    reqs = set()
     for cr in com_req:
+        coms.append(cr['name'])
+        com_dict[cr['name']] = cr['requirements']
         for req in cr['requirements']:
-            if req['desc'] not in reqs:
-                reqs.append(req['desc'])
-                req_dict[req['desc']] = []
-            req_dict[req['desc']].append({'desc':cr['name'],'level':req['level']})
+            reqs.add(req['desc'])
 
-    for com_pair in itertools.product(reqs,reqs):
+    for com_pair in itertools.product(coms, coms):
         if com_pair[0] == com_pair[1]:
             continue
-        key = '{}~.~{}'.format(com_pair[0],com_pair[1])
-        if key not in req_scores:
-            l1 = req_dict[com_pair[0]]
-            l2 = req_dict[com_pair[1]]
-            score = generate_affinity_score(l1,l2)
+        key = '{}~.~{}'.format(com_pair[0], com_pair[1])
+        if key not in com_scores:
+            idx1 = coms.index(com_pair[0])
+            idx2 = coms.index(com_pair[1])
+            score = generate_affinity_score(com_req[idx1]['requirements'], com_req[idx2]['requirements'])
             if score > 0.0:
-                req_scores[key] = score
+                com_scores[key] = score
 
     sorted_table =[('#','Correlation')]
     sorted_scores = []
     sorted_labels = []
 
-    for i, x in enumerate(sorted(req_scores.items(), key=itemgetter(1), reverse=True)):
+    for i, x in enumerate(sorted(com_scores.items(), key=itemgetter(1), reverse=True)):
         comps = '{}: {:.2%}'.format(x[0].replace('~.~', ' -> '),x[1])
         sorted_table.append((str(i+1),comps))
         sorted_scores.append(x[1]*100)
         sorted_labels.append(str(i+1))
 
-    #sorted_scores = [(str(i),x[0].replace('~.~','->')+': '+str(x[1])) for i,x in enumerate(sorted(com_scores.items(), key=itemgetter(1),reverse=True))]
     labels_tuple = tuple(sorted_labels[:20])
     y_pos = np.arange(len(labels_tuple))
     plt.clf()
