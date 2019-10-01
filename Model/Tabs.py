@@ -142,26 +142,41 @@ def scatter_plot(json):
     requirements_apply(json, lambda r, c: set_dictionary_insert(req_map,r['desc'],(c['name'],r['level'])))
     requirements_apply(json, lambda r, c: set_dictionary_insert(com_map,c['name'],(r['desc'],r['level'])))
 
-    xplot_desc_map = {}
     num = 1
+    ch_str = 'A'
+
+    def increment_chars(ch_str):
+        for i in range(len(ch_str)-1,-1,-1):
+            ch = ch_str[i]
+            if ch != 'Z':
+                ch_list = list(ch_str)
+                ch_list[i] = chr(ord(ch) + 1)
+                return "".join(ch_list)
+        #add digit
+        return 'A' +ch_str
+
     unique_reqs = {}
+    unique_comps = {}
     high_reqs =([],[])
     med_reqs =([],[])
     low_reqs = ([],[])
     for key, val_set in com_map.items():
+        if key not in unique_comps:
+            unique_comps[key] = ch_str
+            ch_str = increment_chars(ch_str)
         for txt, lvl in val_set:
             if txt not in unique_reqs:
                 unique_reqs[txt]=(str(num))
                 num = num + 1
             if lvl.lower() == 'high':
-                high_reqs[0].append(key)
-                high_reqs[1].append(txt)
+                high_reqs[0].append(unique_comps[key])
+                high_reqs[1].append(unique_reqs[txt])
             elif lvl.lower() == 'low':
-                low_reqs[0].append(key)
-                low_reqs[1].append(txt)
+                low_reqs[0].append(unique_comps[key])
+                low_reqs[1].append(unique_reqs[txt])
             else:
-                med_reqs[0].append(key)
-                med_reqs[1].append(txt)
+                med_reqs[0].append(unique_comps[key])
+                med_reqs[1].append(unique_reqs[txt])
 
     colors = ['red', 'orange','green']
 
@@ -172,7 +187,9 @@ def scatter_plot(json):
 
     # Plot bars and create text labels for the table
     cell_text = []
-    for key,val in xplot_desc_map.items():
+    for key,val in unique_reqs.items():
+        cell_text.append([val,key])
+    for key,val in unique_comps.items():
         cell_text.append([val,key])
 
     return FigureCanvasKivyAgg(plt.gcf()),cell_text
