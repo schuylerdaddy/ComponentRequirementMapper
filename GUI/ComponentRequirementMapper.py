@@ -14,6 +14,49 @@ from GUI.SaveFileDialogue import SaveFileDialogue
 
 import json
 
+class ComponentRequirementTextFileReader:
+    def decorate_line(self,line):
+        words = line.strip().split(' ')
+        return ' '.join([word.lower().capitalize() for word in words])
+
+    def read_requirements(self,fd):
+        req = None
+        comps = []
+        for line in fd.readlines():
+            line = line.strip()
+            if not line:
+                yield (req,comps)
+                comps = []
+                req = []
+            if not req:
+                req = line.strip().capitalize()
+            else:
+                terms = line.split(':')
+                level = terms[1].strip().capitalize()
+                comps.append((self.decorate_line(terms[0]), level))
+        yield (req,comps)
+
+    def read_mappings(self,filepath):
+        reqs = []
+        coms = []
+        com_data = []
+        idx = 1
+        with open(filepath,'r') as fd:
+            for req in self.read_requirements(fd):
+                if req and req[0] and req[1]:
+                    reqs.append(req[0])
+                    for link in req[1]:
+                        comp = link[0]
+                        level = link[1]
+                        if comp in coms:
+                            c_idx = coms.index(comp)
+                            com_data[c_idx][1][idx] =level
+                        else:
+                            coms.append(comp)
+                            com_data.append((comp,{idx:level}))
+                    idx +=1
+        return com_data, reqs
+
 class InfoModal(ModalView):
     def __init__(self,txt, **kwargs):
         super(InfoModal, self).__init__(**kwargs)
@@ -329,7 +372,7 @@ class Menu(BoxLayout):
                 } for id, level in cmp.requirement_view.tag.items()]
                 component = {'name':cmp.get_text(),'requirements': links}
                 components.append(component)
-            self.output = {'components':components}
+        self.output = {'components':components}
         SaveFileDialogue(button_text="Save", on_ok=self.save_components_to_file).open()
 
     def generate_open_popup(self, any):
@@ -337,14 +380,13 @@ class Menu(BoxLayout):
 
     def save_components_to_file(self, path):
         with open(path, 'w') as outfile:
-            json.dump(self.output, outfile)
+            json.dump(self.output, outfile,indent=2)
 
     def read_filepath_and_load(self,fp):
-        if fp:
+        if fp and fp.endswith('.json'):
             txt = open(fp,'r').read()
             data = json.loads(txt)
             comp_data= []
-            com_req_map = {}
             reqs = []
             CheckboxModal.intensity_levels = {}
             for comp in data['components']:
@@ -357,14 +399,15 @@ class Menu(BoxLayout):
                     if desc not in reqs:
                         reqs.append(desc)
                         idx = len(reqs)
-                        CheckboxModal.intensity_levels[str(idx)] = level
                     else:
                         idx = reqs.index(desc) + 1
-                        CheckboxModal.intensity_levels[str(idx)] = level
 
                     comp_req_ids[idx]= level
                 comp_data.append((name,comp_req_ids))
             self.reload_func(comp_data,reqs)
+        elif fp:
+            comp_data,reqs = ComponentRequirementTextFileReader().read_mappings(fp)
+            self.reload_func(comp_data, reqs)
 
 class MappingView(BoxLayout):
     def __init__(self,component_data=None,requirements=None,**kwargs):

@@ -22,16 +22,16 @@ class TabPanels(BoxLayout):
         self.json_retriever = json_retriever
 
     def set_tabs(self,tab_data):
-        for tab,fn in tab_data.items():
+        for tab,(fn, links) in tab_data.items():
             btn = Button(text=tab, size=(100, 100), size_hint=(1, 1.0/len(tab_data) ))
-            btn.bind(on_press = partial(self.run_func_and_refresh_tab, fn ))
+            btn.bind(on_press = partial(self.run_func_and_refresh_tab, fn, links ))
             self.add_widget(btn)
 
     def set_parent(self,parent):
         self.parent = parent
-    def run_func_and_refresh_tab(self,fn,caller):
-        new_panel,new_table = fn(self.json_retriever())
-        self.parent.refresh_graph_panel(new_panel,new_table)
+    def run_func_and_refresh_tab(self,fn,links,caller):
+        new_panel,new_table,return_buttons= fn(self.json_retriever())
+        self.parent.refresh_graph_panel(new_panel,links,table_data=new_table,custom_buttons=return_buttons)
 
 class MenuBar(AnchorLayout):
     def __init__(self, **kwargs):
@@ -93,13 +93,62 @@ class ReqTable(ScrollView):
 
         self.add_widget(self.grid)
 
+class LinkTabs(BoxLayout):
+    def __init__(self,link_data,json_retriever=None,**kwargs):
+        super(LinkTabs, self).__init__(**kwargs)
+        self.orientation ='horizontal'
+        self.link_data = link_data
+        self.json_retriever = json_retriever
+        self.set_link_buttons(link_data)
+        self.size_hint = (1,.07)
+
+    def set_link_buttons(self,link_data):
+        for name, graph_func in link_data:
+            btn = Button(text=name, size_hint=(1.0/len(link_data),1 ))
+            btn.bind(on_press = partial(self.run_func_and_refresh_tab, graph_func, self.link_data ))
+            self.add_widget(btn)
+
+    def set_parent(self,parent_container):
+        self.parent_container= parent_container
+    def run_func_and_refresh_tab(self,fn,link_data, caller):
+        new_panel,new_table,return_buttons = fn(self.json_retriever())
+        self.parent_container.refresh_graph_panel(new_panel, link_data, return_buttons, new_table)
+
+class CustomButtons(BoxLayout):
+    def __init__(self,custom_buttons,template_func,json_retriever=None,**kwargs):
+        super(CustomButtons, self).__init__(**kwargs)
+        self.orientation ='horizontal'
+        self.custom_buttons = custom_buttons
+        self.json_retriever = json_retriever
+        self.set_custom_buttons(custom_buttons)
+        self.size_hint = (1,.07)
+        self.template_func = template_func
+
+    def set_custom_buttons(self, custom_buttons):
+        for name in custom_buttons:
+            btn = Button(text=name, size_hint=(1.0/len(custom_buttons),1 ))
+            bound_func = partial(self.template_func,self.json_retriever,name)
+            btn.bind(on_press = partial(self.run_func_and_refresh_tab,bound_func))
+            self.add_widget(btn)
+
+    def set_parent(self,parent_container):
+        self.parent_container= parent_container
+    def run_func_and_refresh_tab(self,fn,caller):
+        new_panel,new_table,return_buttons = fn(self.json_retriever())
+        self.parent_container.refresh_graph_panel(new_panel, link_data, return_buttons, new_table)
 
 class DataView(BoxLayout):
-    def __init__(self, graph, table,**kwargs):
+    def __init__(self, graph, table, links=None, **kwargs):
         super(DataView, self).__init__(**kwargs)
         self.orientation = 'vertical'
         self.size_hint =(1, 1)
-        self.add_widget(graph)
+        if links:
+            layout = BoxLayout(orientation='vertical')
+            layout.add_widget(graph)
+            layout.add_widget(links)
+            self.add_widget(layout)
+        else:
+            self.add_widget(graph)
         self.add_widget(table)
 
 class MainView(BoxLayout):
@@ -113,17 +162,28 @@ class MainView(BoxLayout):
         table= ReqTable()
         self.dataView = DataView(self.generate_graph_panel(graph_panel),table)
         self.add_widget(self.dataView)
+        self.json_retriever = json_retriever
 
-    def refresh_graph_panel(self,new_panel,table_data=None):
+    def refresh_graph_panel(self,new_panel,link_data=None,custom_buttons=None,table_data=None):
         self.remove_widget(self.dataView)
         table = ReqTable()
         table.set_table(table_data)
-        self.dataView = DataView(self.generate_graph_panel(new_panel), table)
+        if link_data :
+            links = LinkTabs(link_data,self.json_retriever)
+            links.set_parent(self)
+        elif custom_buttons:
+            links = LinkTabs(custom_buttons,self.json_retriever)
+            links.set_parent(self)
+        else:
+            links = None
+        if not new_panel:
+            new_panel = Button()
+        self.dataView = DataView(self.generate_graph_panel(new_panel), table, links)
         self.add_widget(self.dataView)
 
-    def generate_graph_panel(self,component):
-        comp = BoxLayout(size_hint = (1, 0.7))
-        comp.add_widget(component)
+    def generate_graph_panel(self,graph):
+        comp = BoxLayout(size_hint = (1, 0.95))
+        comp.add_widget(graph)
         self.dataView = comp
         return self.dataView
 

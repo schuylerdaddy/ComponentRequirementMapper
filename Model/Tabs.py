@@ -1,4 +1,5 @@
 import json as JSON
+from functools import partial
 from operator import itemgetter
 
 import itertools
@@ -133,8 +134,47 @@ def group_by_levels(values):
             med_reqs.append(txt)
     return high_reqs,med_reqs,low_reqs,unique_reqs
 
+def get_requirement_score(reqs):
+        t = 0
+        if not reqs:
+            return t
 
-def scatter_plot(json):
+        if isinstance(reqs[0], dict):
+            level_func = lambda x: x['level'].lower()
+        elif isinstance(reqs[0], tuple):
+            level_func = lambda x: x[1].lower()
+        for req in reqs:
+            if level_func(req) == 'low':
+                t += 1
+            if level_func(req) == 'medium':
+                t += 2
+            if level_func(req) == 'high':
+                t += 3
+        return t / 3
+
+def average_requirement_score(reqs):
+    t = 0
+    if not reqs:
+        return t
+
+    if isinstance(reqs[0], dict):
+        level_func = lambda x: x['level'].lower()
+    elif isinstance(reqs[0], tuple):
+        level_func = lambda x: x[1].lower()
+    for req in reqs:
+        if level_func(req) == 'low':
+            t += 1
+        if level_func(req) == 'medium':
+            t += 2
+        if level_func(req) == 'high':
+            t += 3
+    return t / 3 / len(reqs)
+
+class Globals:
+    g_num = 1
+    g_ch_str = 'A'
+
+def scatter_plot(json, args = None):
     if not json:
         json = test_json
     com_map = {}
@@ -142,48 +182,77 @@ def scatter_plot(json):
     requirements_apply(json, lambda r, c: set_dictionary_insert(req_map,r['desc'],(c['name'],r['level'])))
     requirements_apply(json, lambda r, c: set_dictionary_insert(com_map,c['name'],(r['desc'],r['level'])))
 
-    num = 1
-    ch_str = 'A'
+    if args and "order_by" in args:
+        order_by = args["order_by"]
+        if order_by == "comp_count":
+            com_map = sorted(com_map.items(),key=lambda x: len(com_map[x[0]]),reverse=True)
+            req_map = None
+        elif order_by == "req_count":
+            com_map = sorted(req_map.items(),key=lambda x: len(req_map[x[0]]),reverse=True)
+        elif order_by == "comp_level":
+            com_map = sorted(com_map.items(),key=lambda x: average_requirement_score(list(com_map[x[0]])),reverse=True)
+            req_map = None
+        elif order_by == "req_level":
+            com_map = sorted(req_map.items(), key=lambda x: average_requirement_score(list(req_map[x[0]])),reverse=True)
+    else:
+        com_map = list(map(lambda x: x, com_map.items()))
 
-    def increment_chars(ch_str):
-        for i in range(len(ch_str)-1,-1,-1):
-            ch = ch_str[i]
+    Globals.g_num = 1
+    Globals.g_ch_str = 'A'
+    def increment_num():
+        num = Globals.g_num
+        Globals.g_num = Globals.g_num +1
+        return num
+    def increment_char():
+        chr_str = Globals.g_ch_str
+        for i in range(len(Globals.g_ch_str)-1,-1,-1):
+            ch = Globals.g_ch_str[i]
             if ch != 'Z':
-                ch_list = list(ch_str)
+                ch_list = list(Globals.g_ch_str)
                 ch_list[i] = chr(ord(ch) + 1)
-                return "".join(ch_list)
+                Globals.g_ch_str = "".join(ch_list)
+                return chr_str
         #add digit
-        return 'A' +ch_str
+        Globals.g_ch_str = 'A' + Globals.g_ch_str
+        return chr_str
 
     unique_reqs = {}
     unique_comps = {}
-    high_reqs =([],[])
-    med_reqs =([],[])
-    low_reqs = ([],[])
-    for key, val_set in com_map.items():
-        if key not in unique_comps:
-            unique_comps[key] = ch_str
-            ch_str = increment_chars(ch_str)
-        for txt, lvl in val_set:
-            if txt not in unique_reqs:
-                unique_reqs[txt]=(str(num))
-                num = num + 1
-            if lvl.lower() == 'high':
-                high_reqs[0].append(unique_comps[key])
-                high_reqs[1].append(unique_reqs[txt])
-            elif lvl.lower() == 'low':
-                low_reqs[0].append(unique_comps[key])
-                low_reqs[1].append(unique_reqs[txt])
-            else:
-                med_reqs[0].append(unique_comps[key])
-                med_reqs[1].append(unique_reqs[txt])
+    reqs_in_order = []
+    color_map = {"high":'red', "medium":'orange', "low":'green'}
 
-    colors = ['red', 'orange','green']
+    for key, val_set in com_map:
+        unique_x = unique_comps
+        unique_y = unique_reqs
+        inc_x = increment_char
+        inc_y = increment_num
+        if req_map:
+            unique_x = unique_reqs
+            unique_y = unique_comps
+            inc_x = increment_num
+            inc_y = increment_char
+        if key not in unique_x:
+            unique_x[key] = str(inc_x())
+        for txt, lvl in val_set:
+            if txt not in unique_y:
+                unique_y[txt]=str(inc_y())
+            if not req_map:
+                reqs_in_order.append(
+                    ([unique_x[key]], [unique_y[txt]], color_map[lvl.lower()])
+                )
+            else:
+                reqs_in_order.append(
+                    ([unique_y[txt]],[unique_x[key]], color_map[lvl.lower()])
+                )
 
     plt.clf()
-    plt.title('Scatterplot')
-    for (comp,req),clr in zip([high_reqs,med_reqs,low_reqs],colors):
-        plt.scatter(comp,req,color=clr)
+    if args and "desc" in args:
+        plt.title("Scatterplot ({})".format(args["desc"]))
+    else:
+        plt.title('Scatterplot')
+
+    for comp, req, clr in reqs_in_order:
+        plt.scatter(comp, req, color=clr)
 
     # Plot bars and create text labels for the table
     cell_text = []
@@ -192,8 +261,7 @@ def scatter_plot(json):
     for key,val in unique_comps.items():
         cell_text.append([val,key])
 
-    return FigureCanvasKivyAgg(plt.gcf()),cell_text
-
+    return FigureCanvasKivyAgg(plt.gcf()),cell_text, None
 
 #def component_correlation(json):
 
@@ -225,8 +293,8 @@ def component_proportion(json):
             shadow=True, startangle=90)
     ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
 
-    plt.title('Component Proportion(not weighted)')
-    return FigureCanvasKivyAgg(plt.gcf()),table_data
+    plt.title('Component Proportion(Levels are Ignored)')
+    return FigureCanvasKivyAgg(plt.gcf()),table_data, None
 
 def requirement_proportion(json):
     if not json:
@@ -263,19 +331,8 @@ def requirement_proportion(json):
             shadow=True, startangle=90)
     ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
 
-    plt.title('Requirement Proportion(not weighted)')
-    return FigureCanvasKivyAgg(plt.gcf()), table_data
-
-def get_requirement_score(reqs):
-        t = 0
-        for req in reqs:
-            if req['level'].lower() == 'low':
-                t += 1
-            if req['level'].lower() == 'medium':
-                t += 2
-            if req['level'].lower() == 'high':
-                t += 3
-        return t/3
+    plt.title('Requirement Proportion(Levels are Ignored)')
+    return FigureCanvasKivyAgg(plt.gcf()), table_data, None
 
 def component_influence(json):
     if not json:
@@ -305,8 +362,8 @@ def component_influence(json):
             shadow=True, startangle=90)
     ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
 
-    plt.title('Component Influence (weighted)')
-    return FigureCanvasKivyAgg(plt.gcf()),table_data
+    plt.title('Component Influence (Levels are Weighted In)')
+    return FigureCanvasKivyAgg(plt.gcf()),table_data, None
 
 def requirement_influence(json):
     if not json:
@@ -343,8 +400,8 @@ def requirement_influence(json):
             shadow=True, startangle=90)
     ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
 
-    plt.title('Requirement Influence(Weighted)')
-    return FigureCanvasKivyAgg(plt.gcf()), table_data
+    plt.title('Requirement Influence(Levels are Weighted In)')
+    return FigureCanvasKivyAgg(plt.gcf()), table_data, None
 
 def generate_correlation_score(g1,g2,total_count):
 
@@ -446,7 +503,7 @@ def component_correlation(json):
     plt.xlabel('Component Composition')
 
     plt.title('Component Correlation')
-    return FigureCanvasKivyAgg(plt.gcf()), sorted_table
+    return FigureCanvasKivyAgg(plt.gcf()), sorted_table, (coms,reqs)
 
 
 
@@ -493,7 +550,150 @@ def requirement_correlation(json):
     plt.xlabel('Requirement Composition')
 
     plt.title('Requirement Correlation')
-    return FigureCanvasKivyAgg(plt.gcf()), sorted_table
+    return FigureCanvasKivyAgg(plt.gcf()), sorted_table, None
+
+def generate_comparison_score(control,other):
+    max_score = len(control)*3
+    tot = 0
+
+    def get_level_num(level):
+        level = level.lower()
+        if level == 'low':
+            return 1
+        elif level == 'medium':
+            return 2
+        elif level == 'high':
+            return 3
+        else:
+            return 0
+    other_names = {x[0]:x[1] for x in other}
+
+    for idx,i1 in enumerate(control):
+        desc = i1[0]
+        score = 0
+        if desc in other_names:
+            s1 = get_level_num(i1[1])
+            s2 = get_level_num(other_names[desc][1])
+            score = (s1+s2)/2
+        tot += score
+
+    return tot/max_score
+
+def component_comparison_reverse_args(base_comp, json):
+    return component_comparison(json,base_comp)
+
+def requirement_comparison_reverse_args(base_comp, json):
+    return requirement_comparison(json,base_comp)
+
+def component_comparison(json, base_cmp=None):
+    if not json:
+        json = test_json
+
+    com_map = {}
+    requirements_apply(json, lambda r, c: set_dictionary_insert(com_map, c['name'], (r['desc'], r['level'])))
+
+    return_buttons = []
+    table = []
+    reverse_index = {}
+    for idx,com in enumerate(com_map,start=1):
+        table.append((idx,com))
+        reverse_index[com] = idx
+        return_buttons.append((str(idx),partial(component_comparison_reverse_args,com)))
+
+    if not base_cmp:
+        return None, table, return_buttons
+
+    base_cmp_data = com_map[base_cmp]
+    scores = [(base_cmp,1.0)]
+
+    def insert_order_by_score(name, score):
+        idx = 0
+        for i in range(0, len(scores)):
+            if score > scores[i][1]:
+                break
+            idx += 1
+        scores.insert(idx,(name, score))
+
+    for cmp in com_map:
+        if cmp != base_cmp:
+            reqs = com_map[cmp]
+            score = generate_comparison_score(base_cmp_data, reqs)
+            insert_order_by_score(cmp, score)
+
+    labels = [reverse_index[tp[0]] for tp in scores]
+    y_pos = np.arange(len(labels))
+    plt.clf()
+    fig, ax = plt.subplots()
+
+    bar_plot = plt.barh(y_pos, [x[1] for x in scores], align='center', alpha=0.5)
+    plt.yticks(y_pos, labels)
+    plt.xlabel('Component Comparison Score')
+
+    def autolabel(bars,names):
+        for idx,(bar,name) in enumerate(zip(bars,names)):
+            width = bar.get_width()
+            ax.text(width*.05, bar.get_y() + bar.get_height()/2,
+                    name)
+
+    autolabel(bar_plot,[tp[0] for tp in scores])
+
+    plt.title("Components Compared To '{}'".format(base_cmp))
+    return FigureCanvasKivyAgg(plt.gcf()), table, return_buttons
+
+def requirement_comparison(json,base_req=None):
+    if not json:
+        json = test_json
+
+    req_map  ={}
+    requirements_apply(json, lambda r, c: set_dictionary_insert(req_map,r['desc'],(c['name'],r['level'])))
+
+    return_buttons = []
+    table = []
+    reverse_index = {}
+    for idx,req in enumerate(req_map,start=1):
+        table.append((idx,req))
+        reverse_index[req] = idx
+        return_buttons.append((str(idx),partial(requirement_comparison_reverse_args,req)))
+
+    if not base_req:
+        return None, table, return_buttons
+
+    base_cmp_data = req_map[base_req]
+    scores = [(base_req,1.0)]
+
+    def insert_order_by_score(name, score):
+        idx = 0
+        for i in range(0, len(scores)):
+            if score > scores[i][1]:
+                break
+            idx += 1
+        scores.insert(idx,(name, score))
+
+    for cmp in req_map:
+        if cmp != base_req:
+            reqs = req_map[cmp]
+            score = generate_comparison_score(base_cmp_data, reqs)
+            insert_order_by_score(cmp, score)
+
+    labels = [reverse_index[tp[0]] for tp in scores]
+    y_pos = np.arange(len(labels))
+    plt.clf()
+    fig, ax = plt.subplots()
+    bar_plot = plt.barh(y_pos, [x[1] for x in scores], align='center', alpha=0.5)
+
+    def autolabel(bars,names):
+        for idx,(bar,name) in enumerate(zip(bars,names)):
+            width = bar.get_width()
+            ax.text(width*.05, bar.get_y() + bar.get_height()/2,
+                    name)
+
+    autolabel(bar_plot,[tp[0] for tp in scores])
+
+    plt.yticks(y_pos, labels)
+    plt.xlabel('Requirement Comparison Score')
+
+    plt.title("Requirements Compared To '{}'".format(base_req))
+    return FigureCanvasKivyAgg(plt.gcf()), table, return_buttons
 
 def component_affinity(json):
     if not json:
@@ -538,7 +738,7 @@ def component_affinity(json):
     plt.xlabel('Requirement Composition')
 
     plt.title('Requirement Correlation')
-    return FigureCanvasKivyAgg(plt.gcf()), sorted_table
+    return FigureCanvasKivyAgg(plt.gcf()), sorted_table, (coms,reqs)
 
 def requirement_affinity(json):
     if not json:
@@ -584,16 +784,136 @@ def requirement_affinity(json):
     plt.xlabel('Requirement Composition')
 
     plt.title('Requirement Correlation')
-    return FigureCanvasKivyAgg(plt.gcf()), sorted_table
+    return FigureCanvasKivyAgg(plt.gcf()), sorted_table, None
+
+def component_level_distributions(json):
+    if not json:
+        json = test_json
+    com_req = JSON.loads(json)['components']
+    high_dists = []
+    med_dists = []
+    low_dists = []
+    coms = []
+    for cr in com_req:
+        coms.append(cr['name'])
+        high_dists.append(0)
+        med_dists.append(0)
+        low_dists.append(0)
+        for req in cr['requirements']:
+            level = req['level'].lower()
+            if level == 'high':
+                high_dists[-1] += 1
+            elif level == 'medium':
+                med_dists[-1] += 1
+            elif level == 'low':
+                low_dists[-1] += 1
+
+    barWidth = 0.25
+
+    # Set position of bar on X axis
+    r1 = np.arange(len(high_dists))
+    r2 = [x + barWidth for x in r1]
+    r3 = [x + barWidth for x in r2]
+
+    labels = []
+    table_data = [("'#'", "'Component Distibution'")]
+    for idx, val in enumerate(coms, start=1):
+        txt = '{}: {}'.format(idx, val)
+        table_data.append((str(idx), txt))
+        labels.append(str(idx))
+
+    # Make the plot
+    plt.clf()
+    plt.bar(r1, high_dists, color='red', width=barWidth, edgecolor='white', label='High')
+    plt.bar(r2, med_dists, color='yellow', width=barWidth, edgecolor='white', label='Medium')
+    plt.bar(r3, low_dists, color='green', width=barWidth, edgecolor='white', label='Low')
+
+    # Add xticks on the middle of the group bars
+    plt.xlabel('group', fontweight='bold')
+    plt.xticks([r + barWidth for r in range(len(high_dists))], labels)
+
+    plt.title('Component Level Distribution')
+    return FigureCanvasKivyAgg(plt.gcf()), table_data, None
+
+def requirement_level_distributions(json):
+    if not json:
+        json = test_json
+
+    req_map  ={}
+    requirements_apply(json, lambda r, c: set_dictionary_insert(req_map,r['desc'],(c['name'],r['level'])))
+
+    high_dists = []
+    med_dists = []
+    low_dists = []
+    reqs = []
+    for req, req_data in req_map.items():
+        reqs.append(req)
+        high_dists.append(0)
+        med_dists.append(0)
+        low_dists.append(0)
+        for com_data in req_data:
+            level = com_data[1].lower()
+            if level == 'high':
+                high_dists[-1] += 1
+            elif level == 'medium':
+                med_dists[-1] += 1
+            elif level == 'low':
+                low_dists[-1] += 1
+
+    barWidth = 0.25
+
+    # Set position of bar on X axis
+    r1 = np.arange(len(high_dists))
+    r2 = [x + barWidth for x in r1]
+    r3 = [x + barWidth for x in r2]
+
+    labels = []
+    table_data = [("'#'", "'Component Distibution'")]
+    for idx, val in enumerate(reqs, start=1):
+        txt = '{}: {}'.format(idx, val)
+        table_data.append((str(idx), txt))
+        labels.append(str(idx))
+
+    # Make the plot
+    plt.clf()
+    plt.bar(r1, high_dists, color='red', width=barWidth, edgecolor='white', label='High')
+    plt.bar(r2, med_dists, color='yellow', width=barWidth, edgecolor='white', label='Medium')
+    plt.bar(r3, low_dists, color='green', width=barWidth, edgecolor='white', label='Low')
+
+    # Add xticks on the middle of the group bars
+    plt.xlabel('group', fontweight='bold')
+    plt.xticks([r + barWidth for r in range(len(high_dists))], labels)
+
+    plt.title('Component Level Distribution')
+    return FigureCanvasKivyAgg(plt.gcf()), table_data, None
 
 statisticViews = {
-    'Scatter Plot':scatter_plot,
-    'Component Proportion': component_proportion,
-    'Requirement Proportion': requirement_proportion,
-    'Component Influence': component_influence,
-    'Requirement Influence': requirement_influence,
-    'Component Affinity': component_affinity,
-    'Requirement Affinity': requirement_affinity,
-    'Component Correlation': component_correlation,
-    'Requirement Correlation': requirement_correlation,
+    'Scatter Plots':(scatter_plot,[
+         ('Comp Count',lambda x:scatter_plot(x,{'order_by':'comp_count',
+                                                'desc':'Organized by requirement count in components'})),
+         ('Req Count',lambda x:scatter_plot(x,{'order_by':'req_count',
+                                                'desc':'Organized by component count in rquirements'})),
+         ('Comp Lvl Avg', lambda x: scatter_plot(x, {'order_by': 'comp_level',
+                                                'desc':'Organized by requirement level average in components'})),
+         ('Req Lvl Avg', lambda x: scatter_plot(x, {'order_by': 'req_level',
+                                                'desc':'Organized by component level average in requirements'})),
+     ]),
+    'Proportions': (component_proportion,[
+        ('Comp Unweighted',component_proportion),
+        ('Comp Weighted',component_influence),
+        ('Req Unweighted',requirement_proportion),
+        ('Req Weighted',requirement_influence),
+    ]),
+    'Correlations': (component_correlation, [
+        ('Comp Affinity', component_affinity),
+        ('Req Affinity',requirement_affinity),
+        ('Comp Correlation', component_correlation),
+        ('Req Correlation' ,requirement_correlation),
+    ]),
+    'Component Comparisons': (component_comparison, None),
+    'Requirement Comparisons': (requirement_comparison, None),
+    'Distributions': (component_level_distributions , [
+        ('Comp Levels', component_level_distributions),
+        ('Req Levels', requirement_level_distributions),
+    ]),
 }
