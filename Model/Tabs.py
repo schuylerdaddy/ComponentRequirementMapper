@@ -252,7 +252,7 @@ def scatter_plot(json, args = None):
         plt.title('Scatterplot')
 
     for comp, req, clr in reqs_in_order:
-        plt.scatter(comp, req, color=clr)
+        plt.scatter(comp, req, color=clr, s=75)
 
     # Plot bars and create text labels for the table
     cell_text = []
@@ -425,7 +425,7 @@ def generate_correlation_score(g1,g2,total_count):
         if desc in g2_names:
             s1 = get_level_num(g1[idx]['level'])
             s2 = get_level_num(g2[g2_names.index(desc)]['level'])
-            tot += (s1+s2)/3
+            tot += (3-abs(s1-s2))/3
 
     return tot/total_count/2
 
@@ -468,6 +468,8 @@ def component_correlation(json):
     com_scores = {}
     coms = []
     reqs = set()
+    reverse_keys = set()
+
     for cr in com_req:
         coms.append(cr['name'])
         com_dict[cr['name']] = cr['requirements']
@@ -478,19 +480,21 @@ def component_correlation(json):
         if com_pair[0] == com_pair[1]:
             continue
         key = '{}~.~{}'.format(com_pair[0],com_pair[1])
-        if key not in com_scores:
+        reverse_key =  '{}~.~{}'.format(com_pair[1],com_pair[0])
+        if key not in com_scores and key not in reverse_keys:
             idx1 = coms.index(com_pair[0])
             idx2 = coms.index(com_pair[1])
             score = generate_correlation_score(com_req[idx1]['requirements'],com_req[idx2]['requirements'],len(reqs))
             if score > 0.0:
                 com_scores[key] = score
+            reverse_keys.add(reverse_key) #prevent duplicate
 
     sorted_table =[('#','Correlation')]
     sorted_scores = []
     sorted_labels = []
 
     for i, x in enumerate(sorted(com_scores.items(), key=itemgetter(1), reverse=True)):
-        comps = '{}: {:.2%}'.format(x[0].replace('~.~',' -> '),x[1])
+        comps = '{}: {:.2%}'.format(x[0].replace('~.~',' <--> '),x[1])
         sorted_table.append((str(i+1),comps))
         sorted_scores.append(x[1]*100)
         sorted_labels.append(str(i+1))
@@ -513,6 +517,7 @@ def requirement_correlation(json):
     com_req = JSON.loads(json)['components']
     req_dict = {}
     req_scores = {}
+    reverse_keys = set()
     reqs = []
     for cr in com_req:
         for req in cr['requirements']:
@@ -525,11 +530,13 @@ def requirement_correlation(json):
         if req_pair[0] == req_pair[1]:
             continue
         key = '{}~.~{}'.format(req_pair[0],req_pair[1])
-        if key not in req_scores:
+        reverse_key = '{}~.~{}'.format(req_pair[1], req_pair[0])
 
+        if key not in req_scores and key not in reverse_keys:
             score = generate_correlation_score(req_dict[req_pair[0]],req_dict[req_pair[1]], len(com_req))
             if score > 0.0:
                 req_scores[key] = score
+            reverse_keys.add(reverse_key)  # prevent duplicate
 
     sorted_table =[('#','Correlation')]
     sorted_scores = []
@@ -566,15 +573,16 @@ def generate_comparison_score(control,other):
             return 3
         else:
             return 0
-    other_names = {x[0]:x[1] for x in other}
+    other_names = {x[0]:x for x in other}
 
-    for idx,i1 in enumerate(control):
-        desc = i1[0]
+    for idx,mapping in enumerate(control):
+        desc = mapping[0]
         score = 0
         if desc in other_names:
-            s1 = get_level_num(i1[1])
-            s2 = get_level_num(other_names[desc][1])
-            score = (s1+s2)/2
+            s1 = get_level_num(mapping[1])
+            other_mapping = other_names[desc]
+            s2 = get_level_num(other_mapping[1])
+            score = (3 - abs(s1-s2))
         tot += score
 
     return tot/max_score
@@ -735,9 +743,9 @@ def component_affinity(json):
     plt.clf()
     plt.barh(y_pos, sorted_scores[:20], align='center', alpha=0.5)
     plt.yticks(y_pos, labels_tuple)
-    plt.xlabel('Requirement Composition')
+    plt.xlabel('Component Composition')
 
-    plt.title('Requirement Correlation')
+    plt.title('Component Affinity')
     return FigureCanvasKivyAgg(plt.gcf()), sorted_table, (coms,reqs)
 
 def requirement_affinity(json):
@@ -783,7 +791,7 @@ def requirement_affinity(json):
     plt.yticks(y_pos, labels_tuple)
     plt.xlabel('Requirement Composition')
 
-    plt.title('Requirement Correlation')
+    plt.title('Requirement Affinity')
     return FigureCanvasKivyAgg(plt.gcf()), sorted_table, None
 
 def component_level_distributions(json):

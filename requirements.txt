@@ -1,8 +1,0 @@
-numpy==1.15.4
-Kivy==1.10.1
-scikit_image==0.14.1
-Keras==2.2.4
-matplotlib==3.0.2
-Pillow==6.0.0
-skimage==0.0
-scikit_learn==0.21.2

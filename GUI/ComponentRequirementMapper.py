@@ -32,6 +32,7 @@ class ComponentRequirementTextFileReader:
                 req = line.strip().capitalize()
             else:
                 terms = line.split(':')
+                print(terms)
                 level = terms[1].strip().capitalize()
                 comps.append((self.decorate_line(terms[0]), level))
         yield (req,comps)
@@ -43,6 +44,7 @@ class ComponentRequirementTextFileReader:
         idx = 1
         with open(filepath,'r') as fd:
             for req in self.read_requirements(fd):
+                print('[{}]'.format(req))
                 if req and req[0] and req[1]:
                     reqs.append(req[0])
                     for link in req[1]:

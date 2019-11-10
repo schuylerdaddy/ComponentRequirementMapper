@@ -1,3 +1,6 @@
 *.json
 yes*
-.DS_Store
+/ArchitectureExamples
+/GUI/__pycache__
+/Model/__pycache__
+.DS_Storegit
